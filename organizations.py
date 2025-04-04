@@ -1,4 +1,4 @@
-approved_organizations = [
+godkendte_organisationer = [
     "Benediktsgruppen",
     "Fruens Bøgegruppen",
     "Hunderupgruppen",

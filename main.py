@@ -19,33 +19,35 @@ from kmd_nexus_client import (
 )
 
 # temp fix since no Q:\
-from organizations import approved_organizations
+from organizations import godkendte_organisationer
 
-nexus_client = None
-citizens_client = None
-organizations_client = None
-calendar_client = None
-assignments_client = None
-tracking_client = None
+nexusklient = None
+nexus_borgere = None
+nexus_organisationer = None
+nexus_kalender = None
+nexus_opgaver = None
+afregningsklient = None
+
 
 async def populate_queue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
 
-    all_organizations = organizations_client.get_all_organizations()
+    alle_organisationer = nexus_organisationer.get_organizations()
 
-    for organization in all_organizations:
-        if organization["name"] not in approved_organizations:
+    for organisation in alle_organisationer:
+        if organisation["name"] not in godkendte_organisationer:
             continue
 
-        citizens = organizations_client.get_citizens_by_organization(organization)
+        borgere = nexus_organisationer.get_citizens_by_organization(organisation)
 
-        logger.info(f"Adding {len(citizens)} citizens to from organization {organization['name']}")
+        logger.info(
+            f"Tilføjer {len(borgere)} borgere fra organisationen {organisation['name']}"
+        )
 
-        for citizen in citizens:
-            if citizen["patientIdentifier"]["type"] != "cpr":
+        for borger in borgere:
+            if borger["patientIdentifier"]["type"] != "cpr":
                 continue
 
-            
 
 async def process_workqueue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
@@ -61,7 +63,7 @@ async def process_workqueue(workqueue: Workqueue):
                 pass
             except WorkItemError as e:
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
-                logger.error(f"Error processing item: {data}. Error: {e}")
+                logger.error(f"Fejl ved processering af item: {data}. Fejl: {e}")
                 item.fail(str(e))
 
 
@@ -72,24 +74,24 @@ if __name__ == "__main__":
 
     # Initialize external systems for automation here..
     credential = Credential.get_credential("KMD Nexus - produktion")
-    tracking_credential = Credential.get_credential("Odense SQL Server")
+    afregnings_credential = Credential.get_credential("Odense SQL Server")
 
-    nexus_client = NexusClient(
+    nexusklient = NexusClient(
         instance=credential.get_data_as_dict()["instance"],
         client_secret=credential.password,
-        client_id=credential.username
+        client_id=credential.username,
     )
 
-    citizens_client = CitizensClient(nexus_client=nexus_client)
-    organizations_client = OrganizationsClient(nexus_client=nexus_client)
-    calendar_client = CalendarClient(nexus_client=nexus_client)
-    assignments_client = AssignmentsClient(nexus_client=nexus_client)
-
-    tracking_client = Tracker(
-        username=tracking_credential.username,
-        password=tracking_credential.password
+    nexus_borgere = CitizensClient(nexus_client=nexusklient)
+    nexus_organisationer = OrganizationsClient(nexus_client=nexusklient)
+    nexus_kalender = CalendarClient(
+        nexus_client=nexusklient, citizens_client=nexus_borgere
     )
+    nexus_opgaver = AssignmentsClient(nexus_client=nexusklient)
 
+    afregningsklient = Tracker(
+        username=afregnings_credential.username, password=afregnings_credential.password
+    )
 
     # Queue management
     if "--queue" in sys.argv:
