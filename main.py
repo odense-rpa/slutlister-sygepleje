@@ -2,6 +2,8 @@ import asyncio
 import logging
 import sys
 
+from datetime import date, timedelta
+
 from odk_tools.tracking import Tracker
 from automation_server_client import (
     AutomationServer,
@@ -16,10 +18,12 @@ from kmd_nexus_client import (
     OrganizationsClient,
     CalendarClient,
     AssignmentsClient,
+    filter_references
 )
 
 # temp fix since no Q:\
 from organizations import godkendte_organisationer
+from indsatser import godkendte_indsatser
 
 nexusklient = None
 nexus_borgere = None
@@ -40,19 +44,22 @@ async def populate_queue(workqueue: Workqueue):
 
         borgere = nexus_organisationer.get_citizens_by_organization(organisation)
 
-        logger.info(
-            f"Tilføjer {len(borgere)} borgere fra organisationen {organisation['name']}"
-        )
+        # logger.info(
+        #     f"Tilføjer {len(borgere)} borgere fra organisationen {organisation['name']}"
+        # )
 
         for borger in borgere:
-            if borger["patientIdentifier"]["type"] != "cpr":
-                continue
+            try:
+                cpr = borger["patientIdentifier"]["identifier"]
+                workqueue.add_item({}, cpr)
+            except Exception as e:
+                logger.error(f"Fejl ved tilføjelse af borger {borger}: {e}")
+
 
 
 async def process_workqueue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
 
-    logger.info("Hello from process workqueue!")
 
     for item in workqueue:
         with item:
@@ -60,6 +67,31 @@ async def process_workqueue(workqueue: Workqueue):
 
             try:
                 # Process the item here
+                borger = nexus_borgere.get_citizen(item.reference)
+
+                # Finder borgers indsatser
+                pathway = nexus_borgere.get_citizen_pathway(borger)
+                basket_grant_references = nexus_borgere.get_citizen_pathway_references(pathway)
+                borgers_indsats_referencer = filter_references(
+                    basket_grant_references,
+                    path="/Sundhedsfagligt grundforløb/*/Indsatser/basketGrantReference",
+                    active_pathways_only=False,
+                )
+
+                for reference in borgers_indsats_referencer:
+                    if reference["name"] not in godkendte_indsatser:
+                        continue
+
+                    borger_kalender = nexus_kalender.get_citizen_calendar(borger)
+                    borger_kalender_begivenheder = nexus_kalender.events(borger_kalender, date.today(), date.today() + timedelta(days=30))
+
+                    for begivenhed in borger_kalender_begivenheder:
+                        if begivenhed["dashboardDescription"] == reference["name"]:
+                            print(reference["name"])
+                            print("howdy!")
+
+                    #borgers_indsats = nexus_borgere.resolve_reference(reference)
+                print("stop")
                 pass
             except WorkItemError as e:
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
