@@ -86,9 +86,14 @@ async def process_workqueue(workqueue: Workqueue):
                     borger_kalender_begivenheder = nexus_kalender.events(borger_kalender, date.today(), date.today() + timedelta(days=30))
 
                     for begivenhed in borger_kalender_begivenheder:
-                        if begivenhed["dashboardDescription"] == reference["name"]:
-                            print(reference["name"])
-                            print("howdy!")
+                        pass
+                        # if reference["name"] in begivenhed["dashboardDescription"]:
+                        #     print(reference["name"])
+                        #     print("howdy!")
+
+                        # if begivenhed["dashboardDescription"] == reference["name"]:
+                        #     print(reference["name"])
+                        #     print("howdy!")
 
                     #borgers_indsats = nexus_borgere.resolve_reference(reference)
                 print("stop")
