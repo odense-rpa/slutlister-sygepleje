@@ -22,6 +22,8 @@ from kmd_nexus_client import (
 )
 
 # temp fix since no Q:\
+from forløbsindplacering import forløbsindplacering
+from workflow_states import godkendte_states
 from organizations import godkendte_organisationer
 from indsatser import godkendte_indsatser
 
@@ -37,6 +39,7 @@ async def populate_queue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
 
     alle_organisationer = nexus_organisationer.get_organizations()
+
 
     for organisation in alle_organisationer:
         if organisation["name"] not in godkendte_organisationer:
@@ -77,25 +80,26 @@ async def process_workqueue(workqueue: Workqueue):
                     path="/Sundhedsfagligt grundforløb/*/Indsatser/basketGrantReference",
                     active_pathways_only=False,
                 )
+                # Henter borgers kalender
+                borger_kalender = nexus_kalender.get_citizen_calendar(borger)
+                borger_kalender_begivenheder = nexus_kalender.events(borger_kalender, date.today(), date.today() + timedelta(days=30))
 
+                # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
                 for reference in borgers_indsats_referencer:
-                    if reference["name"] not in godkendte_indsatser:
+                    if reference["name"] not in godkendte_indsatser or reference["workflowState"]["name"] not in godkendte_states:
                         continue
 
-                    borger_kalender = nexus_kalender.get_citizen_calendar(borger)
-                    borger_kalender_begivenheder = nexus_kalender.events(borger_kalender, date.today(), date.today() + timedelta(days=30))
+                    resolved_reference = nexus_borgere.resolve_reference(reference)
+                    nuværende_bestilling = nexusklient.get(resolved_reference["_links"]["currentOrderedGrant"]["href"]).json()
 
+                    # Check om der er kalenderbegivenhed for denne indsats
                     for begivenhed in borger_kalender_begivenheder:
-                        pass
-                        # if reference["name"] in begivenhed["dashboardDescription"]:
-                        #     print(reference["name"])
-                        #     print("howdy!")
+                        if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]:
+                            continue
+                        else:
+                            pass
+                            # find forløbsindplacering og lav opgave derefter.
 
-                        # if begivenhed["dashboardDescription"] == reference["name"]:
-                        #     print(reference["name"])
-                        #     print("howdy!")
-
-                    #borgers_indsats = nexus_borgere.resolve_reference(reference)
                 print("stop")
                 pass
             except WorkItemError as e:
