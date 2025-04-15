@@ -127,7 +127,7 @@ async def process_workqueue(workqueue: Workqueue):
                             ),
                             None
                         )
-                    # if matchende_indsats is None, set matchende_indsats["ansvarlig_organisation"] to "Sygeplejerådgivere fysisk"
+                    # Hvis der ikke er en matchende indsats, sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk"
                     if matchende_indsats is None:
                         matchende_indsats = {
                             "reference": reference,
@@ -147,7 +147,13 @@ async def process_workqueue(workqueue: Workqueue):
                         start_date=date.today(),
                         due_date=date.today()
                     )
-                    print(opret_opgave)
+
+                    # Afregn opgave
+                    if(opret_opgave):
+                        afregningsklient.track_task("Slutlister sygepleje")
+                        logger.info(
+                            f"Opgave oprettet for borger {item.reference} med på indsats {reference['name']}"
+                        )
 
                 print("stop")
                 pass
