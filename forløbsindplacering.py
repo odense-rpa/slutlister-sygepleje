@@ -23,8 +23,4 @@ forløbsindplacering = [
         "Navn": "Sindslidelse",
         "Ansvarlig organisation": "Sygeplejerådgivere spec."
     },
-    {
-        "Navn": "Intet forløb",
-        "Ansvarlig organisation": "Sygeplejerådgivere fysisk"
-    }
 ]

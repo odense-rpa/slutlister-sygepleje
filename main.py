@@ -18,7 +18,7 @@ from kmd_nexus_client import (
     OrganizationsClient,
     CalendarClient,
     AssignmentsClient,
-    filter_references
+    filter_references,
 )
 
 # temp fix since no Q:\
@@ -40,7 +40,6 @@ async def populate_queue(workqueue: Workqueue):
 
     alle_organisationer = nexus_organisationer.get_organizations()
 
-
     for organisation in alle_organisationer:
         if organisation["name"] not in godkendte_organisationer:
             continue
@@ -59,10 +58,8 @@ async def populate_queue(workqueue: Workqueue):
                 logger.error(f"Fejl ved tilføjelse af borger {borger}: {e}")
 
 
-
 async def process_workqueue(workqueue: Workqueue):
     logger = logging.getLogger(__name__)
-
 
     for item in workqueue:
         with item:
@@ -74,7 +71,9 @@ async def process_workqueue(workqueue: Workqueue):
 
                 # Finder borgers indsatser
                 pathway = nexus_borgere.get_citizen_pathway(borger)
-                basket_grant_references = nexus_borgere.get_citizen_pathway_references(pathway)
+                basket_grant_references = nexus_borgere.get_citizen_pathway_references(
+                    pathway
+                )
                 borgers_indsats_referencer = filter_references(
                     basket_grant_references,
                     path="/Sundhedsfagligt grundforløb/*/Indsatser/basketGrantReference",
@@ -82,23 +81,73 @@ async def process_workqueue(workqueue: Workqueue):
                 )
                 # Henter borgers kalender
                 borger_kalender = nexus_kalender.get_citizen_calendar(borger)
-                borger_kalender_begivenheder = nexus_kalender.events(borger_kalender, date.today(), date.today() + timedelta(days=30))
+                borger_kalender_begivenheder = nexus_kalender.events(
+                    borger_kalender, date.today(), date.today() + timedelta(weeks=26)
+                )
 
                 # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
                 for reference in borgers_indsats_referencer:
-                    if reference["name"] not in godkendte_indsatser or reference["workflowState"]["name"] not in godkendte_states:
+                    if (
+                        reference["name"] not in godkendte_indsatser
+                        or reference["workflowState"]["name"] not in godkendte_states
+                    ):
                         continue
 
                     resolved_reference = nexus_borgere.resolve_reference(reference)
-                    nuværende_bestilling = nexusklient.get(resolved_reference["_links"]["currentOrderedGrant"]["href"]).json()
+                    nuværende_bestilling = nexusklient.get(
+                        resolved_reference["_links"]["currentOrderedGrant"]["href"]
+                    ).json()
 
                     # Check om der er kalenderbegivenhed for denne indsats
-                    for begivenhed in borger_kalender_begivenheder:
-                        if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]:
-                            continue
-                        else:
-                            pass
-                            # find forløbsindplacering og lav opgave derefter.
+                    matchende_begivenhed = next(
+                        (
+                            begivenhed
+                            for begivenhed in borger_kalender_begivenheder
+                            if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed[
+                                "patientGrantIdentifiers"
+                            ]
+                        ),
+                        None,
+                    )
+                    # Hvis der er en matchende begivenhed, så ignorer denne indsats
+                    if matchende_begivenhed:
+                        continue
+
+                    # Hvis der ikke er en begivenhed, så find forløbsindplacering
+                    if not matchende_begivenhed:
+                        matchende_indsats = next(
+                            (
+                                {
+                                    "reference": reference,
+                                    "ansvarlig_organisation": forløb["Ansvarlig organisation"]
+                                }
+                                for reference in borgers_indsats_referencer
+                                for forløb in forløbsindplacering
+                                if reference["name"] == forløb["Navn"]
+                            ),
+                            None
+                        )
+                    # if matchende_indsats is None, set matchende_indsats["ansvarlig_organisation"] to "Sygeplejerådgivere fysisk"
+                    if matchende_indsats is None:
+                        matchende_indsats = {
+                            "reference": reference,
+                            "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
+                        }
+
+
+                    print(matchende_indsats["ansvarlig_organisation"])
+                    # Opret opgave
+                    opret_opgave = nexus_opgaver.create_assignment(
+                        object=resolved_reference,
+                        assignment_type="Tværfagligt samarbejde",
+                        title="testopgave fra rpa",
+                        responsible_organization=matchende_indsats["ansvarlig_organisation"],
+                        responsible_worker=None,
+                        description=None,
+                        start_date=date.today(),
+                        due_date=date.today()
+                    )
+                    print(opret_opgave)
 
                 print("stop")
                 pass
