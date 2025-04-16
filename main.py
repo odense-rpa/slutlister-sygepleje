@@ -92,7 +92,8 @@ async def process_workqueue(workqueue: Workqueue):
                         or reference["workflowState"]["name"] not in godkendte_states
                     ):
                         continue
-
+                    
+                    # Pakker indsats ud for at finde id
                     resolved_reference = nexus_borgere.resolve_reference(reference)
                     nuværende_bestilling = nexusklient.get(
                         resolved_reference["_links"]["currentOrderedGrant"]["href"]
@@ -114,34 +115,32 @@ async def process_workqueue(workqueue: Workqueue):
                         continue
 
                     # Hvis der ikke er en begivenhed, så find forløbsindplacering
-                    if not matchende_begivenhed:
-                        matchende_indsats = next(
-                            (
-                                {
-                                    "reference": reference,
-                                    "ansvarlig_organisation": forløb["Ansvarlig organisation"]
-                                }
-                                for reference in borgers_indsats_referencer
-                                for forløb in forløbsindplacering
-                                if reference["name"] == forløb["Navn"]
-                            ),
-                            None
-                        )
+                    matchende_forløbsindplacering = next(
+                        (
+                            {
+                                "ansvarlig_organisation": forløb["Ansvarlig organisation"]
+                            }
+                            for reference in borgers_indsats_referencer
+                            for forløb in forløbsindplacering
+                            if reference["name"] == forløb["Navn"]
+                            and reference["workflowState"]["name"] in godkendte_states
+                        ),
+                        None
+                    )
                     # Hvis der ikke er en matchende indsats, sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk"
-                    if matchende_indsats is None:
-                        matchende_indsats = {
-                            "reference": reference,
+                    if matchende_forløbsindplacering is None:
+                        matchende_forløbsindplacering = {
                             "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
                         }
 
 
-                    print(matchende_indsats["ansvarlig_organisation"])
+                    print(matchende_forløbsindplacering["ansvarlig_organisation"])
                     # Opret opgave
                     opret_opgave = nexus_opgaver.create_assignment(
                         object=resolved_reference,
                         assignment_type="Tværfagligt samarbejde",
                         title="testopgave fra rpa",
-                        responsible_organization=matchende_indsats["ansvarlig_organisation"],
+                        responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
                         responsible_worker=None,
                         description=None,
                         start_date=date.today(),
