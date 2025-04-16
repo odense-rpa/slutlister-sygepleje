@@ -79,6 +79,19 @@ async def process_workqueue(workqueue: Workqueue):
                     path="/Sundhedsfagligt grundforløb/*/Indsatser/basketGrantReference",
                     active_pathways_only=False,
                 )
+
+                # Finder borgers forløbsindplacering
+                forløbsindplacering_reference = next(
+                    (ref for ref in basket_grant_references if ref["name"] == "ÆHF - Forløbsindplacering (Grundforløb)"),
+                    None
+                )
+                # KAN DETTE LAVES PÆNERE?? #
+                forløbsindplacering_navn = (
+                    forløbsindplacering_reference["children"][0]["children"][0]["children"][0]["name"]
+                    if forløbsindplacering_reference
+                    else None
+                )
+
                 # Henter borgers kalender
                 borger_kalender = nexus_kalender.get_citizen_calendar(borger)
                 borger_kalender_begivenheder = nexus_kalender.events(
@@ -114,24 +127,16 @@ async def process_workqueue(workqueue: Workqueue):
                     if matchende_begivenhed:
                         continue
 
-                    # Hvis der ikke er en begivenhed, så find forløbsindplacering
-                    matchende_forløbsindplacering = next(
-                        (
-                            {
-                                "ansvarlig_organisation": forløb["Ansvarlig organisation"]
-                            }
-                            for reference in borgers_indsats_referencer
-                            for forløb in forløbsindplacering
-                            if reference["name"] == forløb["Navn"]
-                            and reference["workflowState"]["name"] in godkendte_states
-                        ),
-                        None
-                    )
-                    # Hvis der ikke er en matchende indsats, sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk"
-                    if matchende_forløbsindplacering is None:
+                    # Hvis der ikke er en begivenhed, så find forløbsindplacering. Hvis der ikke er en forløbsindplacering, så sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk"
+                    if forløbsindplacering_navn is None:
                         matchende_forløbsindplacering = {
                             "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
                         }
+                    else:
+                        matchende_forløbsindplacering = next(
+                            (f for f in forløbsindplacering if f["navn"] == forløbsindplacering_navn),
+                            None
+                        )
 
 
                     print(matchende_forløbsindplacering["ansvarlig_organisation"])

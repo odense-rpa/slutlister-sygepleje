@@ -1,26 +1,26 @@
 forløbsindplacering = [
     {
-        "Navn": "Fysisk funktionsnedsættelse ophørende",
-        "Ansvarlig organisation": "Sygeplejerådgivere fysisk"
+        "navn": "Fysisk funktionsnedsættelse ophørende",
+        "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
     },
     {
-        "Navn": "Fysisk funktionsnedsættelse vedvarende",
-        "Ansvarlig organisation": "Sygeplejerådgivere fysisk"
+        "navn": "Fysisk funktionsnedsættelse vedvarende",
+        "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
     },
     {
-        "Navn": "Vedvarende sygdomsudvikling",
-        "Ansvarlig organisation": "Sygeplejerådgivere vedv."
+        "navn": "Vedvarende sygdomsudvikling",
+        "ansvarlig_organisation": "Sygeplejerådgivere vedv."
     },
     {
-        "Navn": "Erhvervet hjerneskade",
-        "Ansvarlig organisation": "Sygeplejerådgivere spec."
+        "navn": "Erhvervet hjerneskade",
+        "ansvarlig_organisation": "Sygeplejerådgivere spec."
     },
     {
-        "Navn": "Medfødt hjerneskade",
-        "Ansvarlig organisation": "Sygeplejerådgivere spec."
+        "navn": "Medfødt hjerneskade",
+        "ansvarlig_organisation": "Sygeplejerådgivere spec."
     },
     {
-        "Navn": "Sindslidelse",
-        "Ansvarlig organisation": "Sygeplejerådgivere spec."
+        "navn": "Sindslidelse",
+        "ansvarlig_organisation": "Sygeplejerådgivere spec."
     },
 ]
