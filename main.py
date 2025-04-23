@@ -50,6 +50,8 @@ async def populate_queue(workqueue: Workqueue):
         #     f"Tilføjer {len(borgere)} borgere fra organisationen {organisation['name']}"
         # )
 
+        # 
+        
         for borger in borgere:
             try:
                 cpr = borger["patientIdentifier"]["identifier"]
@@ -106,8 +108,16 @@ async def process_workqueue(workqueue: Workqueue):
                     ):
                         continue
                     
-                    # Pakker indsats ud for at finde id
+                    # Pakker indsats ud for at få nuværende opgaver samt id
                     resolved_reference = nexus_borgere.resolve_reference(reference)
+                    
+                    # Checker indsatsens opgaver og skipper den, hvis der allerede er oprettet en opgave på den indsats
+                    referencens_opgaver = nexus_opgaver.get_assignments(resolved_reference)
+                    if any(opgaver.get("title") == "testopgave fra rpa" for opgaver in referencens_opgaver):
+                        # Hvis der allerede er oprettet en opgave, så spring denne indsats over
+                        continue
+
+                    # Finder id
                     nuværende_bestilling = nexusklient.get(
                         resolved_reference["_links"]["currentOrderedGrant"]["href"]
                     ).json()
