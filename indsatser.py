@@ -1,6 +1,4 @@
 godkendte_indsatser = [
-    "Grundlæggende sygepleje (SUL §138)",
-    "Kompleks sygepleje (SUL § 138)",
     "medicindispensering",
     "medicinadministration",
     "akutindsats SUL § 138",
