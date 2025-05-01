@@ -86,6 +86,24 @@ async def process_workqueue(workqueue: Workqueue):
                     path="/Sundhedsfagligt grundforløb/*/Indsatser/basketGrantReference",
                     active_pathways_only=False,
                 )
+                # Hvis borger har Kompleks sygepleje (SUL §138) eller Grundlæggende sygepleje (SUL §138) så fortsæt - ellers skip borger
+                fundet_sygepleje = next(
+                    (
+                        ref for ref in borgers_indsats_referencer
+                        if (
+                            ref["name"] in [
+                                "Kompleks sygepleje (SUL §138)",
+                                "Grundlæggende sygepleje (SUL §138)"
+                            ]
+                            and ref["workflowState"]["name"] in godkendte_states
+                        )
+                    ),
+                    None
+                )
+
+                if not fundet_sygepleje:
+                    # Hvis borger ikke har sygepleje, så spring denne borger over
+                    continue
 
                 # Finder borgers forløbsindplacering
                 forløbsindplacering_grundforløb = next(
@@ -99,8 +117,8 @@ async def process_workqueue(workqueue: Workqueue):
                 )
 
                 # Pakker forløbsindplacering ud for at få nuværende opgaver. Skipper borger hvis der allerede er oprettet en opgave på forløbsindplacering
-                resolved_forløbsindplacering_grundforløb = nexus_borgere.resolve_reference(forløbsindplacering_raw)
-                forløbsindplacering_opgaver = nexus_opgaver.get_assignments(resolved_forløbsindplacering_grundforløb)
+                resolved_forløbsindplacering = nexus_borgere.resolve_reference(forløbsindplacering_raw)
+                forløbsindplacering_opgaver = nexus_opgaver.get_assignments(resolved_forløbsindplacering)
                 if any(opgaver.get("title") == "testopgave fra rpa" for opgaver in forløbsindplacering_opgaver):
                     # Hvis der allerede er oprettet en opgave, så spring denne borger over
                     continue
@@ -120,7 +138,7 @@ async def process_workqueue(workqueue: Workqueue):
                 # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
                 for reference in borgers_indsats_referencer:
                     if (
-                        reference["name"] not in godkendte_indsatser
+                        reference["name"].lower() not in godkendte_indsatser
                         or reference["workflowState"]["name"] not in godkendte_states
                     ):
                         continue
@@ -158,7 +176,7 @@ async def process_workqueue(workqueue: Workqueue):
 
                     print(matchende_forløbsindplacering["ansvarlig_organisation"])
                     inaktiver_indsats(borger, resolved_reference)
-                    
+
                 #Opret én opgave pr. borger på forløbsindplacering. Ligegyldgt om vi har lukket indsatser eller ej.
                 nexus_opgaver.create_assignment(
                     object=resolved_reference,
