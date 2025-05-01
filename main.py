@@ -104,14 +104,8 @@ async def process_workqueue(workqueue: Workqueue):
                 if any(opgaver.get("title") == "testopgave fra rpa" for opgaver in forløbsindplacering_opgaver):
                     # Hvis der allerede er oprettet en opgave, så spring denne borger over
                     continue
-
-                # # KAN DETTE LAVES PÆNERE?? #
-                # forløbsindplacering_navn = (
-                #     forløbsindplacering_grundforløb["children"][0]["children"][0]["children"][0]["name"]
-                #     if forløbsindplacering_grundforløb
-                #     else None
-                # )
-
+                
+                # Matcher fundne forløbsindplacering med forløbsindplaceringslisten fra Myndighed
                 matchende_forløbsindplacering = next(
                     (f for f in forløbsindplacering if f["navn"] == forløbsindplacering_raw["name"]),
                     None
@@ -134,13 +128,6 @@ async def process_workqueue(workqueue: Workqueue):
                     # Pakker indsats ud for at få nuværende opgaver samt id
                     resolved_reference = nexus_borgere.resolve_reference(reference)
                     
-                    # Checker indsatsens opgaver og skipper den, hvis der allerede er oprettet en opgave på den indsats
-                    # TODO ændr references_opgaver til forløbsindplaceringens opgaver
-                    # referencens_opgaver = nexus_opgaver.get_assignments(resolved_reference)
-                    # if any(opgaver.get("title") == "testopgave fra rpa" for opgaver in referencens_opgaver):
-                    #     # Hvis der allerede er oprettet en opgave, så spring denne indsats over
-                    #     continue
-
                     # Finder id
                     nuværende_bestilling = nexusklient.get(
                         resolved_reference["_links"]["currentOrderedGrant"]["href"]
@@ -161,41 +148,31 @@ async def process_workqueue(workqueue: Workqueue):
                     if matchende_begivenhed:
                         continue
 
-                    # Hvis der ikke er en begivenhed, så find forløbsindplacering. Hvis der ikke er en forløbsindplacering, så sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk"
+                    # Hvis der ikke er en forløbsindplacering, så sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk". 
+                    # Burde aldrig ramme her
                     if forløbsindplacering_raw is None:
                         matchende_forløbsindplacering = {
                             "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
                         }
-                    # else:
-                    #     matchende_forløbsindplacering = next(
-                    #         (f for f in forløbsindplacering if f["navn"] == forløbsindplacering_navn),
-                    #         None
-                    #     )
 
 
                     print(matchende_forløbsindplacering["ansvarlig_organisation"])
                     inaktiver_indsats(borger, resolved_reference)
-                    # Opret opgave
-                    # opret_opgave = nexus_opgaver.create_assignment(
-                    #     object=resolved_reference,
-                    #     assignment_type="Tværfagligt samarbejde",
-                    #     title="testopgave fra rpa",
-                    #     responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
-                    #     responsible_worker=None,
-                    #     description=None,
-                    #     start_date=date.today(),
-                    #     due_date=date.today()
-                    # )
+                    
+                #Opret én opgave pr. borger på forløbsindplacering. Ligegyldgt om vi har lukket indsatser eller ej.
+                nexus_opgaver.create_assignment(
+                    object=resolved_reference,
+                    assignment_type="Tværfagligt samarbejde",
+                    title="testopgave fra rpa",
+                    responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
+                    responsible_worker=None,
+                    description=None,
+                    start_date=date.today(),
+                    due_date=date.today()
+                )
 
-                    # # Afregn opgave
-                    # if(opret_opgave):
-                    #     # afregningsklient.track_task("Slutlister sygepleje")
-                    #     logger.info(
-                    #         f"Opgave oprettet for borger {item.reference} med på indsats {reference['name']}"
-                    #     )
 
                 print("stop")
-                pass
             except WorkItemError as e:
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
                 logger.error(f"Fejl ved processering af item: {data}. Fejl: {e}")
@@ -225,9 +202,12 @@ def inaktiver_indsats(borger: dict, resolved_indsats: dict):
         opdaterings_felter["cancelledDate"] = datetime.now().astimezone().isoformat()
 
     try:
+        # Rediger indsats
         nexus_indsatser.edit_grant(
             grant=resolved_indsats,changes=opdaterings_felter, transition=transitions[resolved_indsats["workflowState"]["name"]]
         )
+        # Afregn indsats
+        afregningsklient.track_task("Slutlister sygepleje")
     except Exception as e:
         raise WorkItemError(
             f"Fejl ved inaktivering af indsats på borger {borger['patientIdentifier']['identifier']} med indsats {resolved_indsats['name']}: {e}"
