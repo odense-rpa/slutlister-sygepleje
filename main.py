@@ -136,50 +136,19 @@ async def process_workqueue(workqueue: Workqueue):
                 )
 
                 # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
-                for reference in borgers_indsats_referencer:
-                    if (
-                        reference["name"].lower() not in godkendte_indsatser
-                        or reference["workflowState"]["name"] not in godkendte_states
-                    ):
-                        continue
-                    
-                    # Pakker indsats ud for at få nuværende opgaver samt id
-                    resolved_reference = nexus_borgere.resolve_reference(reference)
-                    
-                    # Finder id
-                    nuværende_bestilling = nexusklient.get(
-                        resolved_reference["_links"]["currentOrderedGrant"]["href"]
-                    ).json()
-
-                    # Check om der er kalenderbegivenhed for denne indsats
-                    matchende_begivenhed = next(
-                        (
-                            begivenhed
-                            for begivenhed in borger_kalender_begivenheder
-                            if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed[
-                                "patientGrantIdentifiers"
-                            ]
-                        ),
-                        None,
+                processér_indsats_referencer(
+                    borgers_indsats_referencer=borgers_indsats_referencer,
+                    godkendte_indsatser=godkendte_indsatser,
+                    godkendte_states=godkendte_states,
+                    nexus_borgere=nexus_borgere,
+                    nexusklient=nexusklient,
+                    borger_kalender_begivenheder=borger_kalender_begivenheder,
+                    borger=borger
                     )
-                    # Hvis der er en matchende begivenhed, så ignorer denne indsats
-                    if matchende_begivenhed:
-                        continue
-
-                    # Hvis der ikke er en forløbsindplacering, så sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk". 
-                    # Burde aldrig ramme her
-                    if forløbsindplacering_raw is None:
-                        matchende_forløbsindplacering = {
-                            "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
-                        }
-
-
-                    print(matchende_forløbsindplacering["ansvarlig_organisation"])
-                    inaktiver_indsats(borger, resolved_reference)
-
-                #Opret én opgave pr. borger på forløbsindplacering. Ligegyldgt om vi har lukket indsatser eller ej.
+                
+                # Vi opretter ALTID en opgave på forløbsindplacering (uanset om der lukkes indsatser eller ej)
                 nexus_opgaver.create_assignment(
-                    object=resolved_reference,
+                    object=resolved_forløbsindplacering,
                     assignment_type="Tværfagligt samarbejde",
                     title="testopgave fra rpa",
                     responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
@@ -189,12 +158,124 @@ async def process_workqueue(workqueue: Workqueue):
                     due_date=date.today()
                 )
 
+                # for reference in borgers_indsats_referencer:
+                #     if (
+                #         reference["name"].lower() not in godkendte_indsatser
+                #         or reference["workflowState"]["name"] not in godkendte_states
+                #     ):
+                #         continue
+                    
+                #     # Pakker indsats ud for at få nuværende opgaver samt id
+                #     resolved_reference = nexus_borgere.resolve_reference(reference)
+                    
+                #     # Finder id
+                #     nuværende_bestilling = nexusklient.get(
+                #         resolved_reference["_links"]["currentOrderedGrant"]["href"]
+                #     ).json()
+
+                #     # Check om der er kalenderbegivenhed for denne indsats
+                #     matchende_begivenhed = next(
+                #         (
+                #             begivenhed
+                #             for begivenhed in borger_kalender_begivenheder
+                #             if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed[
+                #                 "patientGrantIdentifiers"
+                #             ]
+                #         ),
+                #         None,
+                #     )
+                #     # Hvis der er en matchende begivenhed, så ignorer denne indsats
+                #     if matchende_begivenhed:
+                #         continue
+
+                #     # Hvis der ikke er en forløbsindplacering, så sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk". 
+                #     # Burde aldrig ramme her
+                #     if forløbsindplacering_raw is None:
+                #         matchende_forløbsindplacering = {
+                #             "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
+                #         }
+
+
+                #     print(matchende_forløbsindplacering["ansvarlig_organisation"])
+                #     inaktiver_indsats(borger, resolved_reference)
+
+                #Opret én opgave pr. borger på forløbsindplacering. Ligegyldgt om vi har lukket indsatser eller ej.
+
 
                 print("stop")
             except WorkItemError as e:
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
                 logger.error(f"Fejl ved processering af item: {data}. Fejl: {e}")
                 item.fail(str(e))
+
+
+def processér_indsats_referencer(
+    borgers_indsats_referencer,
+    godkendte_indsatser,
+    godkendte_states,
+    nexus_borgere,
+    nexusklient,
+    borger_kalender_begivenheder,
+    borger
+):
+    """
+    Gennemgår en liste af indsatsreferencer for en borger og inaktiverer de indsatser,
+    som er godkendte og ikke har en tilknyttet kalenderbegivenhed.
+
+    En indsats bliver kun inaktiveret, hvis:
+    - Navnet findes i de godkendte indsatser (lowercase).
+    - WorkflowState er blandt de godkendte states.
+    - Der ikke findes en kalenderbegivenhed, som matcher indsatsen.
+
+    Hvis en indsats bliver inaktiveret, returneres True.
+    Hvis ingen indsatser bliver inaktiveret, returneres False.
+
+    Argumenter:
+        borgers_indsats_referencer (list): Liste af indsatsreferencer for borgeren.
+        godkendte_indsatser (set eller list): Navne på godkendte indsatser (lowercase).
+        godkendte_states (set eller list): Navne på godkendte workflow states.
+        nexus_borgere: Nexus klient til at resolve referencer.
+        nexusklient: Nexus HTTP-klient til opslag af currentOrderedGrant.
+        borger_kalender_begivenheder (list): Liste over borgerens kalenderbegivenheder.
+        borger: Borgerobjekt, der skal bruges ved inaktivering.
+
+    Returnerer:
+        bool: True hvis mindst én indsats blev inaktiveret, ellers False.
+    """
+    inaktiveret = False
+
+    for reference in borgers_indsats_referencer:
+        if (
+            reference["name"].lower() not in godkendte_indsatser
+            or reference["workflowState"]["name"] not in godkendte_states
+        ):
+            continue
+
+        # Resolve reference for at få nuværende opgaver og ID
+        resolved_reference = nexus_borgere.resolve_reference(reference)
+
+        # Hent nuværende bestilling
+        nuværende_bestilling = nexusklient.get(
+            resolved_reference["_links"]["currentOrderedGrant"]["href"]
+        ).json()
+
+        # Find ud af om der allerede findes en kalenderbegivenhed for denne indsats
+        matchende_begivenhed = next(
+            (
+                begivenhed
+                for begivenhed in borger_kalender_begivenheder
+                if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]
+            ),
+            None,
+        )
+
+        if matchende_begivenhed:
+            continue
+
+        inaktiver_indsats(borger, resolved_reference)
+        inaktiveret = True
+
+    return inaktiveret
 
 
 def inaktiver_indsats(borger: dict, resolved_indsats: dict):
