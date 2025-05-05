@@ -158,50 +158,6 @@ async def process_workqueue(workqueue: Workqueue):
                     due_date=date.today()
                 )
 
-                # for reference in borgers_indsats_referencer:
-                #     if (
-                #         reference["name"].lower() not in godkendte_indsatser
-                #         or reference["workflowState"]["name"] not in godkendte_states
-                #     ):
-                #         continue
-                    
-                #     # Pakker indsats ud for at få nuværende opgaver samt id
-                #     resolved_reference = nexus_borgere.resolve_reference(reference)
-                    
-                #     # Finder id
-                #     nuværende_bestilling = nexusklient.get(
-                #         resolved_reference["_links"]["currentOrderedGrant"]["href"]
-                #     ).json()
-
-                #     # Check om der er kalenderbegivenhed for denne indsats
-                #     matchende_begivenhed = next(
-                #         (
-                #             begivenhed
-                #             for begivenhed in borger_kalender_begivenheder
-                #             if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed[
-                #                 "patientGrantIdentifiers"
-                #             ]
-                #         ),
-                #         None,
-                #     )
-                #     # Hvis der er en matchende begivenhed, så ignorer denne indsats
-                #     if matchende_begivenhed:
-                #         continue
-
-                #     # Hvis der ikke er en forløbsindplacering, så sæt matchende_indsats["ansvarlig_organisation"] til "Sygeplejerådgivere fysisk". 
-                #     # Burde aldrig ramme her
-                #     if forløbsindplacering_raw is None:
-                #         matchende_forløbsindplacering = {
-                #             "ansvarlig_organisation": "Sygeplejerådgivere fysisk"
-                #         }
-
-
-                #     print(matchende_forløbsindplacering["ansvarlig_organisation"])
-                #     inaktiver_indsats(borger, resolved_reference)
-
-                #Opret én opgave pr. borger på forløbsindplacering. Ligegyldgt om vi har lukket indsatser eller ej.
-
-
                 print("stop")
             except WorkItemError as e:
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
@@ -227,9 +183,6 @@ def processér_indsats_referencer(
     - WorkflowState er blandt de godkendte states.
     - Der ikke findes en kalenderbegivenhed, som matcher indsatsen.
 
-    Hvis en indsats bliver inaktiveret, returneres True.
-    Hvis ingen indsatser bliver inaktiveret, returneres False.
-
     Argumenter:
         borgers_indsats_referencer (list): Liste af indsatsreferencer for borgeren.
         godkendte_indsatser (set eller list): Navne på godkendte indsatser (lowercase).
@@ -238,12 +191,7 @@ def processér_indsats_referencer(
         nexusklient: Nexus HTTP-klient til opslag af currentOrderedGrant.
         borger_kalender_begivenheder (list): Liste over borgerens kalenderbegivenheder.
         borger: Borgerobjekt, der skal bruges ved inaktivering.
-
-    Returnerer:
-        bool: True hvis mindst én indsats blev inaktiveret, ellers False.
     """
-    inaktiveret = False
-
     for reference in borgers_indsats_referencer:
         if (
             reference["name"].lower() not in godkendte_indsatser
@@ -251,10 +199,8 @@ def processér_indsats_referencer(
         ):
             continue
 
-        # Resolve reference for at få nuværende opgaver og ID
         resolved_reference = nexus_borgere.resolve_reference(reference)
 
-        # Hent nuværende bestilling
         nuværende_bestilling = nexusklient.get(
             resolved_reference["_links"]["currentOrderedGrant"]["href"]
         ).json()
@@ -273,10 +219,6 @@ def processér_indsats_referencer(
             continue
 
         inaktiver_indsats(borger, resolved_reference)
-        inaktiveret = True
-
-    return inaktiveret
-
 
 def inaktiver_indsats(borger: dict, resolved_indsats: dict):
     """
