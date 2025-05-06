@@ -136,7 +136,7 @@ async def process_workqueue(workqueue: Workqueue):
                 )
 
                 # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
-                processér_indsats_referencer(
+                vurder_om_indsats_skal_lukkes(
                     borgers_indsats_referencer=borgers_indsats_referencer,
                     godkendte_indsatser=godkendte_indsatser,
                     godkendte_states=godkendte_states,
@@ -165,7 +165,7 @@ async def process_workqueue(workqueue: Workqueue):
                 item.fail(str(e))
 
 
-def processér_indsats_referencer(
+def vurder_om_indsats_skal_lukkes(
     borgers_indsats_referencer,
     godkendte_indsatser,
     godkendte_states,
