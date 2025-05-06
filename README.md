@@ -1,21 +1,6 @@
-## How to use this template
+## Slutlister sygepleje
 
-The repository has been tagged as a template repository. This means you can create a new repository based on this code using the [GitHub instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)
+Denne proces søger at lukke bestemte indsatser i Nexus, hvis der ikke er nogle entries i en borgers kalender for denne indsats.
+Samtidig vil der blive lagt en opgave i Nexus til en organisation ud fra hvilken forløbsindplacering borgeren har. 
 
-
-### Alternative method: checkout the repository and remove git bindings
-Replace `<new-folder-name>` with your desired folder name:
-```sh
-git clone https://github.com/odense-rpa/process-template.git <new-folder-name>
-
-cd <new-folder-name>
-
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from process-template"
-
-git remote add origin <new-repo-url>
-git push -u origin main
-```
-
+Godkendte indsatser, organisationer, der bliver hentet borgere fra samt hvilken organisationer, der skal have besked, står alt sammen i et excelark, der vedligeholdes af Myndighed.
