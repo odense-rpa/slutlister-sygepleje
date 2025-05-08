@@ -132,7 +132,7 @@ async def process_workqueue(workqueue: Workqueue):
                 # Henter borgers kalender
                 borger_kalender = nexus_kalender.get_citizen_calendar(borger)
                 borger_kalender_begivenheder = nexus_kalender.events(
-                    borger_kalender, date.today() + timedelta(days=2), date.today() + timedelta(weeks=26)
+                    borger_kalender, date.today(), date.today() + timedelta(weeks=26)
                 )
 
                 # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
@@ -227,7 +227,7 @@ def inaktiver_indsats(borger: dict, resolved_indsats: dict):
     param resolved_indsats: dict: Indsatsens data
     """
 
-    transitions = {"Bestilt": "Afslut", "Bevilliget": "Annullér", "Ændret": "Afslut"}
+    transitions = {"Bestilt": "Afslut", "Ændret": "Afslut"}
 
     if resolved_indsats["workflowState"]["name"] not in transitions:
         raise WorkItemError(
@@ -239,8 +239,7 @@ def inaktiver_indsats(borger: dict, resolved_indsats: dict):
     if transitions[resolved_indsats["workflowState"]["name"]] == "Afslut":
         opdaterings_felter["billingEndDate"] = datetime.now().astimezone().isoformat()
         opdaterings_felter["basketGrantEndDate"] = datetime.now().astimezone().isoformat()
-    else: 
-        opdaterings_felter["cancelledDate"] = datetime.now().astimezone().isoformat()
+
 
     try:
         # Rediger indsats
