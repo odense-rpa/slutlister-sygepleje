@@ -149,7 +149,7 @@ async def process_workqueue(workqueue: Workqueue):
                 # Vi opretter ALTID en opgave på forløbsindplacering (uanset om der lukkes indsatser eller ej)
                 nexus_opgaver.create_assignment(
                     object=resolved_forløbsindplacering,
-                    assignment_type="Tværfagligt samarbejde",
+                    assignment_type="Myndighed sygeplejevisitation - Ophør af hjælp",
                     title="testopgave fra rpa",
                     responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
                     responsible_worker=None,
