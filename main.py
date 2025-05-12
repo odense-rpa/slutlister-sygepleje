@@ -70,17 +70,15 @@ async def process_workqueue(workqueue: Workqueue):
 
     for item in workqueue:
         with item:
+            lav_opgave_ref = [True]  # Standard: vi vil gerne oprette opgave for hver ny borger
             data = item.get_data_as_dict()
 
             try:
-                # Process the item here
                 borger = nexus_borgere.get_citizen(item.reference)
 
-                # Finder borgers indsatser
+                # Finder borgers indsatser                
                 pathway = nexus_borgere.get_citizen_pathway(borger)
-                basket_grant_references = nexus_borgere.get_citizen_pathway_references(
-                    pathway
-                )
+                basket_grant_references = nexus_borgere.get_citizen_pathway_references(pathway)
                 borgers_indsats_referencer = filter_references(
                     basket_grant_references,
                     path="/Sundhedsfagligt grundforløb/*/Indsatser/basketGrantReference",
@@ -100,10 +98,8 @@ async def process_workqueue(workqueue: Workqueue):
                     ),
                     None
                 )
-
                 if not fundet_sygepleje:
-                    # Hvis borger ikke har sygepleje, så spring denne borger over
-                    continue
+                    continue  # Borger har ikke relevant sygepleje, spring over
 
                 # Finder borgers forløbsindplacering
                 forløbsindplacering_grundforløb = next(
@@ -119,9 +115,9 @@ async def process_workqueue(workqueue: Workqueue):
                 # Pakker forløbsindplacering ud for at få nuværende opgaver. Skipper borger hvis der allerede er oprettet en opgave på forløbsindplacering
                 resolved_forløbsindplacering = nexus_borgere.resolve_reference(forløbsindplacering_raw)
                 forløbsindplacering_opgaver = nexus_opgaver.get_assignments(resolved_forløbsindplacering)
+
                 if any(opgaver.get("title") == "testopgave fra rpa" for opgaver in forløbsindplacering_opgaver):
-                    # Hvis der allerede er oprettet en opgave, så spring denne borger over
-                    continue
+                    continue  # Der findes allerede en opgave, spring borger over
                 
                 # Matcher fundne forløbsindplacering med forløbsindplaceringslisten fra Myndighed
                 matchende_forløbsindplacering = next(
@@ -129,13 +125,13 @@ async def process_workqueue(workqueue: Workqueue):
                     None
                 )
 
-                # Henter borgers kalender
+                # Henter borgers kalenderbegivenheder
                 borger_kalender = nexus_kalender.get_citizen_calendar(borger)
                 borger_kalender_begivenheder = nexus_kalender.events(
                     borger_kalender, date.today(), date.today() + timedelta(weeks=26)
                 )
 
-                # Gennemgår borgers indsatser og ignorer ikke godkendte indsatser
+                # Gennemgår borgers indsatser og lukker hvis relevant – sæt lav_opgave_ref til False hvis begivenhed findes
                 vurder_om_indsats_skal_lukkes(
                     borgers_indsats_referencer=borgers_indsats_referencer,
                     godkendte_indsatser=godkendte_indsatser,
@@ -143,24 +139,25 @@ async def process_workqueue(workqueue: Workqueue):
                     nexus_borgere=nexus_borgere,
                     nexusklient=nexusklient,
                     borger_kalender_begivenheder=borger_kalender_begivenheder,
-                    borger=borger
-                    )
-                
-                # Vi opretter ALTID en opgave på forløbsindplacering (uanset om der lukkes indsatser eller ej)
-                nexus_opgaver.create_assignment(
-                    object=resolved_forløbsindplacering,
-                    assignment_type="Myndighed sygeplejevisitation - Ophør af hjælp",
-                    title="testopgave fra rpa",
-                    responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
-                    responsible_worker=None,
-                    description=None,
-                    start_date=date.today(),
-                    due_date=date.today()
+                    borger=borger,
+                    lav_opgave_flag=lav_opgave_ref
                 )
 
+                if lav_opgave_ref[0]:  # Kun hvis vi ikke fandt en begivenhed, skal vi oprette opgaven
+                    nexus_opgaver.create_assignment(
+                        object=resolved_forløbsindplacering,
+                        assignment_type="Myndighed sygeplejevisitation - Ophør af hjælp",
+                        title="Myndighed sygeplejevisitation - Ophør af hjælp",
+                        responsible_organization=matchende_forløbsindplacering["ansvarlig_organisation"],
+                        responsible_worker=None,
+                        description=None,
+                        start_date=date.today(),
+                        due_date=date.today()
+                    )
+
                 print("stop")
+
             except WorkItemError as e:
-                # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
                 logger.error(f"Fejl ved processering af item: {data}. Fejl: {e}")
                 item.fail(str(e))
 
@@ -172,11 +169,13 @@ def vurder_om_indsats_skal_lukkes(
     nexus_borgere,
     nexusklient,
     borger_kalender_begivenheder,
-    borger
+    borger,
+    lav_opgave_flag  # Nyt argument som vi kan ændre inde i funktionen
 ):
     """
     Gennemgår en liste af indsatsreferencer for en borger og inaktiverer de indsatser,
     som er godkendte og ikke har en tilknyttet kalenderbegivenhed.
+    Hvis der findes en begivenhed for en indsats, sættes lav_opgave_flag til False.
 
     En indsats bliver kun inaktiveret, hvis:
     - Navnet findes i de godkendte indsatser (lowercase).
@@ -200,10 +199,15 @@ def vurder_om_indsats_skal_lukkes(
             continue
 
         resolved_reference = nexus_borgere.resolve_reference(reference)
-
-        nuværende_bestilling = nexusklient.get(
-            resolved_reference["_links"]["currentOrderedGrant"]["href"]
-        ).json()
+        try:
+            # Hent nuværende bestilling
+            nuværende_bestilling = nexusklient.get(
+                resolved_reference["_links"]["currentOrderedGrant"]["href"]
+            ).json()
+        except Exception as e:
+            raise WorkItemError(
+                f"Fejl ved hentning af nuværende bestilling for indsats {resolved_reference['name']}: {e}"
+            )   
 
         # Find ud af om der allerede findes en kalenderbegivenhed for denne indsats
         matchende_begivenhed = next(
@@ -216,6 +220,7 @@ def vurder_om_indsats_skal_lukkes(
         )
 
         if matchende_begivenhed:
+            lav_opgave_flag[0] = False  # Der findes en begivenhed – vi skal ikke oprette ny opgave
             continue
 
         inaktiver_indsats(borger, resolved_reference)
