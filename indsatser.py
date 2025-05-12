@@ -17,7 +17,7 @@ godkendte_indsatser = {
         "Intravenøs væskebehandling",
         "Intravenøs medicinsk behandling",
         "Intravenøs medicinsk behandling med pumpe",
-        "kompresssionsbehandling",
+        "kompressionsbehandling",
         "antabus",
         "Creme",
         "insulin",
