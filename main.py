@@ -124,7 +124,7 @@ async def process_workqueue(workqueue: Workqueue):
                 resolved_forløbsindplacering = nexus_borgere.resolve_reference(forløbsindplacering_raw)
                 forløbsindplacering_opgaver = nexus_opgaver.get_assignments(resolved_forløbsindplacering)
 
-                if any(opgaver.get("title") == "testopgave fra rpa" for opgaver in forløbsindplacering_opgaver):
+                if any(opgaver.get("title") == "Myndighed sygeplejevisitation - Ophør af hjælp" for opgaver in forløbsindplacering_opgaver):
                     continue  # Der findes allerede en opgave, spring borger over
                 
                 # Matcher fundne forløbsindplacering med forløbsindplaceringslisten fra Myndighed
