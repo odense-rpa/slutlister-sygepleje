@@ -3,6 +3,7 @@ godkendte_indsatser = {
         "medicindispensering",
         "medicinadministration",
         "akutindsats SUL § 138",
+        "Opfølgning §138",
         "Anlæggelse og pleje af kateter",
         "Behandling med ortopædiske hjælpemidler",
         "Behandling og pleje af hudproblem",
