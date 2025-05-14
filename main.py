@@ -106,11 +106,19 @@ async def process_workqueue(workqueue: Workqueue):
                     (ref for ref in basket_grant_references if ref["name"] == "ÆHF - Forløbsindplacering (Grundforløb)"),
                     None
                 )
-                forløbsindplacering_raw = (
-                    forløbsindplacering_grundforløb["children"][0]["children"][0]["children"][0]
-                    if forløbsindplacering_grundforløb
-                    else None
-                )
+
+                forløbsindplacering_raw = None
+
+                if forløbsindplacering_grundforløb:
+                    second_children = forløbsindplacering_grundforløb["children"][0]["children"]
+                    indsats_node = next((child for child in second_children if child.get("name") == "Indsatser"), None)
+                    if indsats_node and "children" in indsats_node and indsats_node["children"]:
+                        forløbsindplacering_raw = indsats_node["children"][0]
+                # forløbsindplacering_raw = (
+                #     forløbsindplacering_grundforløb["children"][0]["children"][0]["children"][0]
+                #     if forløbsindplacering_grundforløb
+                #     else None
+                # )
 
                 # Pakker forløbsindplacering ud for at få nuværende opgaver. Skipper borger hvis der allerede er oprettet en opgave på forløbsindplacering
                 resolved_forløbsindplacering = nexus_borgere.resolve_reference(forløbsindplacering_raw)
@@ -214,7 +222,8 @@ def vurder_om_indsats_skal_lukkes(
             (
                 begivenhed
                 for begivenhed in borger_kalender_begivenheder
-                if f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]
+                if isinstance(begivenhed.get("patientGrantIdentifiers"), list) and
+                f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]
             ),
             None,
         )
