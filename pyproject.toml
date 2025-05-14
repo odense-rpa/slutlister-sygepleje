@@ -1,5 +1,5 @@
 [project]
-name = "Slutlister sygepleje"
+name = "slutlister_sygepleje"
 version = "0.1.0"
 description = "Gennemgang af borgers kalender for at vurdere om specikke indsatser stadig have begivenheder i kalenderen. Lukker indsatsen hvis der ikke er nogen indsatser. Myndighed får opgave hvis borger er helt færdig med sygepleje"
 readme = "README.md"
@@ -11,6 +11,6 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-automation-server-client = { git = "https://github.com/odense-rpa/automation-server-client.git" }
 kmd-nexus-client = { git = "https://github.com/odense-rpa/nexus-client.git" }
 odk-tools = { git = "https://github.com/odense-rpa/odk-tools.git" }
+automation-server-client = { git = "https://github.com/odense-rpa/automation-server-client.git", tag = "v0.1.0" }
