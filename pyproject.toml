@@ -1,7 +1,7 @@
 [project]
-name = "process-template"
+name = "Slutlister sygepleje"
 version = "0.1.0"
-description = "Add your description here"
+description = "Gennemgang af borgers kalender for at vurdere om specikke indsatser stadig have begivenheder i kalenderen. Lukker indsatsen hvis der ikke er nogen indsatser. Myndighed får opgave hvis borger er helt færdig med sygepleje"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
