@@ -134,10 +134,15 @@ async def process_workqueue(workqueue: Workqueue):
                 )
 
                 # Henter borgers kalenderbegivenheder
-                borger_kalender = nexus_kalender.get_citizen_calendar(borger)
-                borger_kalender_begivenheder = nexus_kalender.events(
-                    borger_kalender, date.today(), date.today() + timedelta(weeks=26)
-                )
+                try:
+                    borger_kalender = nexus_kalender.get_citizen_calendar(borger)
+                    borger_kalender_begivenheder = nexus_kalender.events(
+                        borger_kalender, date.today(), date.today() + timedelta(weeks=26)
+                    )
+                except Exception as e:
+                    raise WorkItemError(
+                        f"Fejl ved hentning af kalenderbegivenheder for borger {borger['patientIdentifier']['identifier']}: {e}"
+                    )
 
                 # Gennemgår borgers indsatser og lukker hvis relevant – sæt lav_opgave_ref til False hvis begivenhed findes
                 vurder_om_indsats_skal_lukkes(
@@ -200,9 +205,13 @@ def vurder_om_indsats_skal_lukkes(
         borger: Borgerobjekt, der skal bruges ved inaktivering.
     """
     for reference in borgers_indsats_referencer:
+        # Tjek om indsatsen er godkendt, forventet state eller om den er ældre eller ikke ændret inden for 14 dage
+        i_dag_minus_14_dage = datetime.now().astimezone() - timedelta(days=14)
+        reference_dag = datetime.strptime(reference["date"], "%Y-%m-%dT%H:%M:%S.%f%z")
         if (
             reference["name"].lower() not in godkendte_indsatser
             or reference["workflowState"]["name"] not in godkendte_states
+            or reference_dag > i_dag_minus_14_dage
         ):
             continue
 
