@@ -214,7 +214,6 @@ def vurder_om_indsats_skal_lukkes(
         if (
             reference["name"].lower() not in godkendte_indsatser
             or reference["workflowState"]["name"] not in godkendte_states
-            or reference_dag > i_dag_minus_14_dage
         ):
             continue
 
@@ -243,6 +242,11 @@ def vurder_om_indsats_skal_lukkes(
         if matchende_begivenhed:
             lav_opgave_flag[0] = False  # Der findes en begivenhed – vi skal ikke oprette ny opgave
             continue
+
+        if reference_dag > i_dag_minus_14_dage:
+            lav_opgave_flag[0] = False # Der findes en indsats, der er bestilt eller ændret inden for 14 dage fra d.d. – vi skal ikke oprette ny opgave
+            continue
+
 
         inaktiver_indsats(borger, resolved_reference)
 
