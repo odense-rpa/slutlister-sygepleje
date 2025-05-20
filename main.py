@@ -51,12 +51,15 @@ async def populate_queue(workqueue: Workqueue):
         #     f"Tilføjer {len(borgere)} borgere fra organisationen {organisation['name']}"
         # )
 
-        # 
         
         for borger in borgere:
             try:
                 # skip Nancy
                 if borger["patientIdentifier"]["identifier"] == "251248-9996":
+                    continue
+
+                # skip indlagte borgere
+                if borger["patientState"]["name"] == "Indlagt":
                     continue
 
                 cpr = borger["patientIdentifier"]["identifier"]
