@@ -171,8 +171,6 @@ async def process_workqueue(workqueue: Workqueue):
                         due_date=date.today()
                     )
 
-                print("stop")
-
             except WorkItemError as e:
                 logger.error(f"Fejl ved processering af item: {data}. Fejl: {e}")
                 item.fail(str(e))
@@ -218,23 +216,31 @@ def vurder_om_indsats_skal_lukkes(
             continue
 
         resolved_reference = nexus_borgere.resolve_reference(reference)
-        try:
-            # Hent nuværende bestilling
-            nuværende_bestilling = nexusklient.get(
-                resolved_reference["_links"]["currentOrderedGrant"]["href"]
-            ).json()
-        except Exception as e:
-            raise WorkItemError(
-                f"Fejl ved hentning af nuværende bestilling for indsats {resolved_reference['name']}: {e}"
-            )   
+        # Hvis det er en akutindsats, så har den ikke en bestilling
+        if reference["workflowState"]["name"] != "Oprettet (Akut)":
+            try:
+                # Hent nuværende bestilling
+                nuværende_bestilling = nexusklient.get(
+                    resolved_reference["_links"]["currentOrderedGrant"]["href"]
+                ).json()
+            except Exception as e:
+                raise WorkItemError(
+                    f"Fejl ved hentning af nuværende bestilling for indsats {resolved_reference['name']}: {e}"
+                )   
+        else: # Akutindsats har Id direkte liggende.
+            nuværende_bestilling = {}
+            nuværende_bestilling["id"] = resolved_reference["currentOrderGrantId"]
 
-        # Find ud af om der allerede findes en kalenderbegivenhed for denne indsats
+
+        # Find ud af om der allerede findes en kalenderbegivenhed for denne indsats. BASKET_GRANT er for akutindsatser
         matchende_begivenhed = next(
             (
                 begivenhed
                 for begivenhed in borger_kalender_begivenheder
-                if isinstance(begivenhed.get("patientGrantIdentifiers"), list) and
-                f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]
+                if isinstance(begivenhed.get("patientGrantIdentifiers"), list) and (
+                    f"ORDER_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"] or
+                    f"BASKET_GRANT:{nuværende_bestilling['id']}" in begivenhed["patientGrantIdentifiers"]
+                )
             ),
             None,
         )
@@ -247,6 +253,9 @@ def vurder_om_indsats_skal_lukkes(
             lav_opgave_flag[0] = False # Der findes en indsats, der er bestilt eller ændret inden for 14 dage fra d.d. – vi skal ikke oprette ny opgave
             continue
 
+        if reference["workflowState"]["name"] == "Oprettet (Akut)":
+            continue # Akutindsats kan ikke afsluttes
+            
 
         inaktiver_indsats(borger, resolved_reference)
 
