@@ -12,7 +12,6 @@ godkendte_indsatser = {
         "Drænpleje",
         "Ernæringsindsats",
         "Forflytning og mobilisering",
-        "Iltbehandling",
         "Inkontinensbehandling",
         "Intravenøs væskebehandling",
         "Intravenøs medicinsk behandling",
