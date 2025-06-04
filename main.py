@@ -46,11 +46,6 @@ async def populate_queue(workqueue: Workqueue):
             continue
 
         borgere = nexus_organisationer.get_citizens_by_organization(organisation)
-
-        # logger.info(
-        #     f"Tilføjer {len(borgere)} borgere fra organisationen {organisation['name']}"
-        # )
-
         
         for borger in borgere:
             try:
@@ -117,11 +112,6 @@ async def process_workqueue(workqueue: Workqueue):
                     indsats_node = next((child for child in second_children if child.get("name") == "Indsatser"), None)
                     if indsats_node and "children" in indsats_node and indsats_node["children"]:
                         forløbsindplacering_raw = indsats_node["children"][0]
-                # forløbsindplacering_raw = (
-                #     forløbsindplacering_grundforløb["children"][0]["children"][0]["children"][0]
-                #     if forløbsindplacering_grundforløb
-                #     else None
-                # )
 
                 # Pakker forløbsindplacering ud for at få nuværende opgaver. Skipper borger hvis der allerede er oprettet en opgave på forløbsindplacering
                 resolved_forløbsindplacering = nexus_borgere.resolve_reference(forløbsindplacering_raw)
@@ -207,7 +197,7 @@ def vurder_om_indsats_skal_lukkes(
     """
     for reference in borgers_indsats_referencer:
         # Tjek om indsatsen er godkendt, forventet state eller om den er ældre eller ikke ændret inden for 14 dage
-        i_dag_minus_14_dage = datetime.now().astimezone() - timedelta(days=14)
+        i_dag_minus_7_dage = datetime.now().astimezone() - timedelta(days=7)
         reference_dag = datetime.strptime(reference["date"], "%Y-%m-%dT%H:%M:%S.%f%z")
         if (
             reference["name"].lower() not in godkendte_indsatser
@@ -247,50 +237,11 @@ def vurder_om_indsats_skal_lukkes(
 
         if matchende_begivenhed:
             lav_opgave_flag[0] = False  # Der findes en begivenhed – vi skal ikke oprette ny opgave
-            continue
+            break # Vi har fundet en begivenhed, så vi kan skippe borger. Ingen opgave da borger er aktiv i systemet.
 
-        if reference_dag > i_dag_minus_14_dage:
+        if reference_dag > i_dag_minus_7_dage:
             lav_opgave_flag[0] = False # Der findes en indsats, der er bestilt eller ændret inden for 14 dage fra d.d. – vi skal ikke oprette ny opgave
-            continue
-
-        if reference["workflowState"]["name"] == "Oprettet (Akut)":
-            continue # Akutindsats kan ikke afsluttes
-            
-
-        inaktiver_indsats(borger, resolved_reference)
-
-def inaktiver_indsats(borger: dict, resolved_indsats: dict):
-    """
-    Inaktiverer indsats for borger.
-    param borger: dict: Borgerens data
-    param resolved_indsats: dict: Indsatsens data
-    """
-
-    transitions = {"Bestilt": "Afslut", "Ændret": "Afslut"}
-
-    if resolved_indsats["workflowState"]["name"] not in transitions:
-        raise WorkItemError(
-            f"Kan ikke afslutte indsats på borger {borger["patientIdentifier"]["identifier"]} med indsats {resolved_indsats["name"]} da den ikke er i en gyldig tilstand."
-        )
-    
-    opdaterings_felter = {}
-
-    if transitions[resolved_indsats["workflowState"]["name"]] == "Afslut":
-        opdaterings_felter["billingEndDate"] = datetime.now().astimezone().isoformat()
-        opdaterings_felter["basketGrantEndDate"] = datetime.now().astimezone().isoformat()
-
-
-    try:
-        # Rediger indsats
-        nexus_indsatser.edit_grant(
-            grant=resolved_indsats,changes=opdaterings_felter, transition=transitions[resolved_indsats["workflowState"]["name"]]
-        )
-        # Afregn indsats
-        afregningsklient.track_task("Slutlister sygepleje")
-    except Exception as e:
-        raise WorkItemError(
-            f"Fejl ved inaktivering af indsats på borger {borger['patientIdentifier']['identifier']} med indsats {resolved_indsats['name']}: {e}"
-        )
+            break # Indsats er ny, så vi går ud fra, at borger er aktiv. Ingen opgave.
 
 if __name__ == "__main__":
     ats = AutomationServer.from_environment()
