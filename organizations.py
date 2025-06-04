@@ -19,7 +19,7 @@ godkendte_organisationer = [
     # "Aftengruppen Syd-Øst",
     # "Aftengruppen Lavsenvænget",
     # "Aftengruppen Syd-Vest",
-    # "Sundhedsklinik Bolbro",
+    "Sundhedsklinik Bolbro",
     # "Sundhedsklinik Dalum",
     # "Sundhedsklinik Havebæk",
     # "Sundhedsklinik VIVO",
