@@ -160,6 +160,8 @@ async def process_workqueue(workqueue: Workqueue):
                         start_date=date.today(),
                         due_date=date.today()
                     )
+                    # Afregn indsats
+                    afregningsklient.track_task("Slutlister sygepleje")
 
             except WorkItemError as e:
                 logger.error(f"Fejl ved processering af item: {data}. Fejl: {e}")
