@@ -13,6 +13,7 @@ godkendte_indsatser = {
         "Ernæringsindsats",
         "Forflytning og mobilisering",
         "Inkontinensbehandling",
+        "Iltbehandling",
         "Intravenøs væskebehandling",
         "Intravenøs medicinsk behandling",
         "Intravenøs medicinsk behandling med pumpe",
